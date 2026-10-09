@@ -100,11 +100,86 @@ void main() {
     expect(find.text('Evergreen Wellness Hub'), findsOneWidget);
     expect(find.text('Little Bridges Family Center'), findsNothing);
   });
+
+  testWidgets('resource card opens the correct complete detail screen', (
+    tester,
+  ) async {
+    await _openFirstFoodResource(tester);
+
+    expect(find.text('Resource details'), findsOneWidget);
+    expect(find.text('Rose City Community Pantry'), findsOneWidget);
+    expect(
+      find.textContaining('Sample data — not a real service listing'),
+      findsOneWidget,
+    );
+    expect(find.text('Services offered'), findsOneWidget);
+    expect(find.text('Eligibility requirements'), findsOneWidget);
+    expect(find.text('Documents to bring'), findsOneWidget);
+    expect(find.text('Languages supported'), findsOneWidget);
+    expect(find.text('Accessibility'), findsOneWidget);
+  });
+
+  testWidgets('report action opens anonymous prototype report form', (
+    tester,
+  ) async {
+    await _openReportForm(tester);
+
+    expect(find.text('Report outdated information'), findsOneWidget);
+    expect(find.textContaining('no identity is collected'), findsOneWidget);
+    expect(find.text('Incorrect hours'), findsOneWidget);
+    expect(find.byKey(const Key('report-details-field')), findsOneWidget);
+  });
+
+  testWidgets('report submission requires a selected reason', (tester) async {
+    await _openReportForm(tester);
+
+    await tester.ensureVisible(find.byKey(const Key('submit-report-button')));
+    await tester.tap(find.byKey(const Key('submit-report-button')));
+    await tester.pump();
+
+    expect(find.text('Select a reason before submitting.'), findsOneWidget);
+    expect(find.text('Report outdated information'), findsOneWidget);
+  });
+
+  testWidgets('valid report confirms and returns to resource details', (
+    tester,
+  ) async {
+    await _openReportForm(tester);
+
+    await tester.tap(find.byKey(const Key('report-reason-incorrectHours')));
+    await tester.ensureVisible(find.byKey(const Key('submit-report-button')));
+    await tester.tap(find.byKey(const Key('submit-report-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Resource details'), findsOneWidget);
+    expect(find.byKey(const Key('report-confirmation')), findsOneWidget);
+    expect(
+      find.textContaining('recorded for this session only'),
+      findsOneWidget,
+    );
+  });
 }
 
 Future<void> _searchForZip(WidgetTester tester, String zipCode) async {
   await tester.pumpWidget(const BridgePdxApp());
   await tester.enterText(find.byKey(const Key('zip-code-field')), zipCode);
   await tester.tap(find.byKey(const Key('zip-search-button')));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _openFirstFoodResource(WidgetTester tester) async {
+  await tester.pumpWidget(const BridgePdxApp());
+  await tester.tap(find.byKey(const Key('category-food')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const Key('resource-card-food-1')));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _openReportForm(WidgetTester tester) async {
+  await _openFirstFoodResource(tester);
+  await tester.ensureVisible(
+    find.byKey(const Key('report-outdated-information-button')),
+  );
+  await tester.tap(find.byKey(const Key('report-outdated-information-button')));
   await tester.pumpAndSettle();
 }

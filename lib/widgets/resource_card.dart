@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import '../models/community_resource.dart';
 
 class ResourceCard extends StatelessWidget {
-  const ResourceCard({required this.resource, super.key});
+  const ResourceCard({required this.resource, required this.onTap, super.key});
 
   final CommunityResource resource;
+  final VoidCallback onTap;
 
   void _showPendingMessage(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
@@ -18,82 +19,98 @@ class ResourceCard extends StatelessWidget {
     return Card(
       key: Key('resource-${resource.id}'),
       color: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              resource.name,
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(resource.description),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                Chip(
-                  avatar: Icon(
-                    resource.isOpenNow ? Icons.check_circle : Icons.cancel,
-                    size: 18,
-                  ),
-                  label: Text(
-                    resource.isOpenNow ? 'Shown as open' : 'Shown as closed',
-                  ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: Key('resource-card-${resource.id}'),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                resource.name,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(resource.description),
+              const SizedBox(height: 6),
+              Text(
+                'Tap for full details',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w600,
                 ),
-                if (resource.isWheelchairAccessible)
-                  const Chip(
-                    avatar: Icon(Icons.accessible, size: 18),
-                    label: Text('Wheelchair accessible'),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  Chip(
+                    avatar: Icon(
+                      resource.isOpenNow ? Icons.check_circle : Icons.cancel,
+                      size: 18,
+                    ),
+                    label: Text(
+                      resource.isOpenNow ? 'Shown as open' : 'Shown as closed',
+                    ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _Detail(icon: Icons.location_on_outlined, label: resource.address),
-            _Detail(
-              icon: Icons.schedule,
-              label: 'Sample hours: ${resource.hours}',
-            ),
-            _Detail(
-              icon: Icons.accessible,
-              label: resource.accessibilityInformation,
-            ),
-            _Detail(
-              icon: Icons.fact_check_outlined,
-              label: 'Eligibility: ${resource.eligibilitySummary}',
-            ),
-            _Detail(
-              icon: Icons.verified_outlined,
-              label: 'Last verified: ${_formatDate(resource.lastVerified)}',
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                FilledButton.icon(
-                  onPressed: () => _showPendingMessage(
-                    context,
-                    'Phone integration will be added later. Sample number: ${resource.phoneNumber}',
+                  if (resource.isWheelchairAccessible)
+                    const Chip(
+                      avatar: Icon(Icons.accessible, size: 18),
+                      label: Text('Wheelchair accessible'),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _Detail(
+                icon: Icons.location_on_outlined,
+                label: resource.fullAddress,
+              ),
+              _Detail(
+                icon: Icons.schedule,
+                label: 'Sample hours: ${resource.hours}',
+              ),
+              _Detail(
+                icon: Icons.accessible,
+                label: resource.accessibilityInformation,
+              ),
+              _Detail(
+                icon: Icons.fact_check_outlined,
+                label: 'Eligibility: ${resource.eligibilitySummary}',
+              ),
+              _Detail(
+                icon: Icons.verified_outlined,
+                label: 'Last verified: ${_formatDate(resource.lastVerified)}',
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  FilledButton.icon(
+                    onPressed: () => _showPendingMessage(
+                      context,
+                      'Phone integration will be added later. Sample number: ${resource.phoneNumber}',
+                    ),
+                    icon: const Icon(Icons.call),
+                    label: const Text('Call'),
                   ),
-                  icon: const Icon(Icons.call),
-                  label: const Text('Call'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: () => _showPendingMessage(
-                    context,
-                    'Map and directions integration will be added later.',
+                  OutlinedButton.icon(
+                    onPressed: () => _showPendingMessage(
+                      context,
+                      'Map and directions integration will be added later.',
+                    ),
+                    icon: const Icon(Icons.directions),
+                    label: const Text('Directions'),
                   ),
-                  icon: const Icon(Icons.directions),
-                  label: const Text('Directions'),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

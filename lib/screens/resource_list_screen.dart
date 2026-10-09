@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/sample_resources.dart';
 import '../models/resource_query.dart';
 import '../widgets/resource_card.dart';
+import 'resource_detail_screen.dart';
 
 class ResourceListScreen extends StatefulWidget {
   const ResourceListScreen({required this.query, super.key});
@@ -68,7 +69,15 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
                 ...resources.map(
                   (resource) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
-                    child: ResourceCard(resource: resource),
+                    child: ResourceCard(
+                      resource: resource,
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) =>
+                              ResourceDetailScreen(resource: resource),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
             ],
