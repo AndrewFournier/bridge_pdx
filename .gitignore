@@ -33,6 +33,12 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# .NET backend build output and local secrets
+**/bin/
+**/obj/
+backend/.env
+backend/.env.*
+
 # Symbolication related
 app.*.symbols
 

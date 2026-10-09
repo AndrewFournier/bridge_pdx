@@ -1,0 +1,11 @@
+@BridgePdx.Api_HostAddress = http://localhost:5080
+
+GET {{BridgePdx.Api_HostAddress}}/health
+Accept: application/json
+
+###
+
+GET {{BridgePdx.Api_HostAddress}}/api/resources?category=Food&zipCode=97201&openNow=true
+Accept: application/json
+
+###
