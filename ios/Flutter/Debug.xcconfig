@@ -1,1 +1,4 @@
 #include "Generated.xcconfig"
+
+// Debug-only local HTTP access for the BridgePDX development API.
+INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking = YES

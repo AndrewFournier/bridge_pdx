@@ -2,11 +2,13 @@ import 'package:bridge_pdx/app.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/fake_resource_repository.dart';
+
 void main() {
   testWidgets('BridgePDX home screen loads with all resource categories', (
     tester,
   ) async {
-    await tester.pumpWidget(const BridgePdxApp());
+    await _pumpApp(tester);
 
     expect(find.text('BridgePDX'), findsOneWidget);
     expect(find.text('Find help near you'), findsOneWidget);
@@ -21,7 +23,7 @@ void main() {
   testWidgets('Food category opens a filtered Food Resources screen', (
     tester,
   ) async {
-    await tester.pumpWidget(const BridgePdxApp());
+    await _pumpApp(tester);
 
     await tester.tap(find.byKey(const Key('category-food')));
     await tester.pumpAndSettle();
@@ -37,7 +39,7 @@ void main() {
   testWidgets('invalid ZIP code displays inline error and does not navigate', (
     tester,
   ) async {
-    await tester.pumpWidget(const BridgePdxApp());
+    await _pumpApp(tester);
 
     await tester.enterText(find.byKey(const Key('zip-code-field')), '9720A');
     await tester.tap(find.byKey(const Key('zip-search-button')));
@@ -61,7 +63,7 @@ void main() {
   testWidgets('category browsing combines category and ZIP filters', (
     tester,
   ) async {
-    await tester.pumpWidget(const BridgePdxApp());
+    await _pumpApp(tester);
     await tester.enterText(find.byKey(const Key('zip-code-field')), '97201');
 
     await tester.tap(find.byKey(const Key('category-food')));
@@ -80,7 +82,7 @@ void main() {
 
     expect(find.text('Evergreen Wellness Hub'), findsOneWidget);
     await tester.tap(find.byKey(const Key('filter-open-now')));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.text('Rose City Community Pantry'), findsOneWidget);
     expect(find.text('Little Bridges Family Center'), findsOneWidget);
@@ -94,7 +96,7 @@ void main() {
     await _searchForZip(tester, '97201');
 
     await tester.tap(find.byKey(const Key('filter-wheelchair-accessible')));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.text('Rose City Community Pantry'), findsOneWidget);
     expect(find.text('Evergreen Wellness Hub'), findsOneWidget);
@@ -161,18 +163,27 @@ void main() {
 }
 
 Future<void> _searchForZip(WidgetTester tester, String zipCode) async {
-  await tester.pumpWidget(const BridgePdxApp());
+  await _pumpApp(tester);
   await tester.enterText(find.byKey(const Key('zip-code-field')), zipCode);
   await tester.tap(find.byKey(const Key('zip-search-button')));
   await tester.pumpAndSettle();
 }
 
 Future<void> _openFirstFoodResource(WidgetTester tester) async {
-  await tester.pumpWidget(const BridgePdxApp());
+  await _pumpApp(tester);
   await tester.tap(find.byKey(const Key('category-food')));
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const Key('resource-card-food-1')));
   await tester.pumpAndSettle();
+}
+
+Future<void> _pumpApp(
+  WidgetTester tester, [
+  FakeResourceRepository? repository,
+]) async {
+  await tester.pumpWidget(
+    BridgePdxApp(repository: repository ?? FakeResourceRepository()),
+  );
 }
 
 Future<void> _openReportForm(WidgetTester tester) async {

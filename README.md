@@ -1,12 +1,12 @@
 # BridgePDX
 
-BridgePDX is a Flutter community-resource prototype with an ASP.NET Core API foundation. The Flutter application still uses its local sample data and is **not connected to the backend** in this milestone.
+BridgePDX is a Flutter community-resource prototype backed by an ASP.NET Core resource API and PostgreSQL. Flutter screens access the API through an injected repository; local sample data remains isolated to deterministic tests and development utilities.
 
 All current listings, organizations, addresses, phone numbers, websites, eligibility details, and schedules are fictional development data. They are not verified real-world services.
 
 ## Architecture
 
-- `lib/` and `test/`: Flutter Material 3 application and widget tests.
+- `lib/` and `test/`: Flutter Material 3 application, HTTP repository, JSON mapping, and deterministic tests with fake repositories.
 - `backend/BridgePdx.Api`: .NET 10 ASP.NET Core Web API, EF Core, PostgreSQL configuration, development seed data, health check, and Swagger UI.
 - `backend/BridgePdx.Api.Tests`: isolated HTTP integration tests using EF Core's in-memory provider. PostgreSQL and Docker are not required for tests.
 - `backend/BridgePdx.Backend.sln`: backend solution containing both .NET projects.
@@ -65,13 +65,64 @@ dotnet tool run dotnet-ef --tool-manifest backend/dotnet-tools.json -- database 
 
 The API also applies pending migrations and inserts clearly fictional seed resources when it starts in Development. The seeder is idempotent and is not run in production or tests.
 
+## Complete local development workflow
+
+1. Start Docker Desktop or another Compose-compatible runtime.
+2. Start PostgreSQL from the repository root:
+
+   ```sh
+   docker compose -f backend/compose.yaml up -d postgres
+   docker compose -f backend/compose.yaml ps
+   ```
+
+3. Restore the local EF tool and apply migrations if needed:
+
+   ```sh
+   dotnet tool restore --tool-manifest backend/dotnet-tools.json
+   dotnet tool run dotnet-ef --tool-manifest backend/dotnet-tools.json -- database update --project backend/BridgePdx.Api/BridgePdx.Api.csproj --startup-project backend/BridgePdx.Api/BridgePdx.Api.csproj
+   ```
+
+4. Start the API with its stable Development launch profile:
+
+   ```sh
+   dotnet run --project backend/BridgePdx.Api/BridgePdx.Api.csproj --launch-profile development
+   ```
+
+   The server binds to `0.0.0.0:5080` so an Android emulator can reach it. Use these client URLs:
+
+   - Host browser and iOS simulator/macOS: `http://127.0.0.1:5080`
+   - Android emulator: `http://10.0.2.2:5080`
+   - Swagger from the host: `http://127.0.0.1:5080/swagger`
+
+5. Start an Android emulator.
+6. Run Flutter:
+
+   ```sh
+   flutter pub get
+   flutter run
+   ```
+
+The Android default is `http://10.0.2.2:5080`; iOS simulator and macOS default to `http://127.0.0.1:5080`. Override any development base URL with:
+
+```sh
+flutter run --dart-define=BRIDGE_PDX_API_BASE_URL=http://127.0.0.1:5080
+```
+
+A physical phone cannot use the Mac's loopback address. Put the phone and Mac on the same trusted development network, allow the API through the Mac firewall, determine the Mac's LAN address, and run for example:
+
+```sh
+flutter run --dart-define=BRIDGE_PDX_API_BASE_URL=http://192.168.1.25:5080
+```
+
+Android cleartext HTTP is allowed only by the debug manifest. Release builds do not opt into cleartext traffic; a future production API URL must use HTTPS. The API skips HTTPS redirection only in Development and Testing, while non-development hosting retains HTTPS redirection and remains configurable through standard ASP.NET Core settings.
+
 ## Run the API and Swagger
 
 ```sh
-dotnet run --project backend/BridgePdx.Api/BridgePdx.Api.csproj
+dotnet run --project backend/BridgePdx.Api/BridgePdx.Api.csproj --launch-profile development
 ```
 
-Use the HTTP or HTTPS address printed by `dotnet run`, then open `/swagger` in a browser. The development CORS allowlist is limited to the explicit localhost origins in `appsettings.Development.json`; no unrestricted production CORS policy is registered.
+Open `http://127.0.0.1:5080/swagger`. The development CORS allowlist is limited to the explicit localhost origins in `appsettings.Development.json`; no unrestricted production CORS policy is registered.
 
 Available routes:
 

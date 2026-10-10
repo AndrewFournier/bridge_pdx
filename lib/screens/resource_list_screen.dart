@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 
-import '../data/sample_resources.dart';
+import '../models/community_resource.dart';
 import '../models/resource_query.dart';
+import '../repositories/resource_repository.dart';
 import '../widgets/resource_card.dart';
 import 'resource_detail_screen.dart';
 
 class ResourceListScreen extends StatefulWidget {
-  const ResourceListScreen({required this.query, super.key});
+  const ResourceListScreen({
+    required this.query,
+    required this.repository,
+    super.key,
+  });
 
   final ResourceQuery query;
+  final ResourceRepository repository;
 
   @override
   State<ResourceListScreen> createState() => _ResourceListScreenState();
@@ -17,21 +23,81 @@ class ResourceListScreen extends StatefulWidget {
 class _ResourceListScreenState extends State<ResourceListScreen> {
   bool _openNow = false;
   bool _wheelchairAccessible = false;
+  bool _isLoading = true;
+  List<CommunityResource> _resources = const [];
+  ResourceRepositoryErrorType? _errorType;
+  int _requestGeneration = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadResources();
+  }
+
+  @override
+  void dispose() {
+    _requestGeneration++;
+    super.dispose();
+  }
+
+  Future<void> _loadResources() async {
+    final generation = ++_requestGeneration;
+    setState(() {
+      _isLoading = true;
+      _errorType = null;
+    });
+
+    try {
+      final resources = await widget.repository.fetchResources(
+        query: widget.query,
+        openNow: _openNow ? true : null,
+        wheelchairAccessible: _wheelchairAccessible ? true : null,
+      );
+      if (!mounted || generation != _requestGeneration) return;
+      setState(() {
+        _resources = resources;
+        _isLoading = false;
+      });
+    } on ResourceRepositoryException catch (error) {
+      if (!mounted || generation != _requestGeneration) return;
+      setState(() {
+        _resources = const [];
+        _isLoading = false;
+        _errorType = error.type;
+      });
+    } catch (_) {
+      if (!mounted || generation != _requestGeneration) return;
+      setState(() {
+        _resources = const [];
+        _isLoading = false;
+        _errorType = ResourceRepositoryErrorType.connection;
+      });
+    }
+  }
+
+  void _setOpenNow(bool value) {
+    if (_openNow == value) return;
+    setState(() => _openNow = value);
+    _loadResources();
+  }
+
+  void _setWheelchairAccessible(bool value) {
+    if (_wheelchairAccessible == value) return;
+    setState(() => _wheelchairAccessible = value);
+    _loadResources();
+  }
 
   void _clearFilters() {
+    if (!_openNow && !_wheelchairAccessible) return;
     setState(() {
       _openNow = false;
       _wheelchairAccessible = false;
     });
+    _loadResources();
   }
 
   @override
   Widget build(BuildContext context) {
-    final resources = widget.query.apply(
-      sampleResources,
-      openNow: _openNow,
-      wheelchairAccessible: _wheelchairAccessible,
-    );
     final hasActiveFilters = _openNow || _wheelchairAccessible;
 
     return Scaffold(
@@ -53,28 +119,41 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
               _ResourceFilters(
                 openNow: _openNow,
                 wheelchairAccessible: _wheelchairAccessible,
-                onOpenNowChanged: (value) => setState(() => _openNow = value),
-                onWheelchairChanged: (value) =>
-                    setState(() => _wheelchairAccessible = value),
+                onOpenNowChanged: _setOpenNow,
+                onWheelchairChanged: _setWheelchairAccessible,
                 onClear: hasActiveFilters ? _clearFilters : null,
               ),
               const SizedBox(height: 12),
-              if (resources.isEmpty)
+              if (_isLoading)
+                const Padding(
+                  key: Key('resource-list-loading'),
+                  padding: EdgeInsets.symmetric(vertical: 48),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_errorType != null)
+                _ResourceErrorState(
+                  isConnectionError:
+                      _errorType == ResourceRepositoryErrorType.connection,
+                  onRetry: _loadResources,
+                )
+              else if (_resources.isEmpty)
                 _EmptyState(
                   hasActiveFilters: hasActiveFilters,
                   hasZipCode: widget.query.zipCode != null,
                   onClearFilters: _clearFilters,
                 )
               else
-                ...resources.map(
+                ..._resources.map(
                   (resource) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: ResourceCard(
                       resource: resource,
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute<void>(
-                          builder: (_) =>
-                              ResourceDetailScreen(resource: resource),
+                          builder: (_) => ResourceDetailScreen(
+                            resourceId: resource.id,
+                            repository: widget.repository,
+                          ),
                         ),
                       ),
                     ),
@@ -83,6 +162,53 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ResourceErrorState extends StatelessWidget {
+  const _ResourceErrorState({
+    required this.isConnectionError,
+    required this.onRetry,
+  });
+
+  final bool isConnectionError;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      key: const Key('resource-list-error'),
+      padding: const EdgeInsets.symmetric(vertical: 48),
+      child: Column(
+        children: [
+          Icon(
+            Icons.cloud_off_outlined,
+            size: 56,
+            color: Theme.of(context).colorScheme.outline,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            isConnectionError
+                ? 'Unable to connect to BridgePDX'
+                : 'Resources are temporarily unavailable',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Check that the local API is running, then try again.',
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            key: const Key('resource-list-retry'),
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry'),
+          ),
+        ],
       ),
     );
   }

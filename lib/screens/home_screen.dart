@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 
-import '../data/sample_resources.dart';
+import '../data/resource_categories.dart';
 import '../models/resource_category.dart';
 import '../models/resource_query.dart';
+import '../repositories/resource_repository.dart';
 import '../widgets/category_card.dart';
 import 'resource_list_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({required this.repository, super.key});
+
+  final ResourceRepository repository;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -44,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => ResourceListScreen(
+          repository: widget.repository,
           query: ResourceQuery(
             category: category,
             zipCode: trimmedZip.isEmpty ? null : trimmedZip,
@@ -154,7 +158,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 return GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: sampleCategories.length,
+                  itemCount: resourceCategories.length,
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: columns,
                     crossAxisSpacing: 12,
@@ -162,7 +166,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     mainAxisExtent: 200,
                   ),
                   itemBuilder: (context, index) {
-                    final category = sampleCategories[index];
+                    final category = resourceCategories[index];
                     return CategoryCard(
                       category: category,
                       onTap: () => _openCategory(category),

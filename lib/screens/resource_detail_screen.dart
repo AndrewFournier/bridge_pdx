@@ -2,11 +2,153 @@ import 'package:flutter/material.dart';
 
 import '../models/community_resource.dart';
 import '../models/outdated_information_report.dart';
+import '../repositories/resource_repository.dart';
 import '../widgets/detail_section.dart';
 import 'report_outdated_information_screen.dart';
 
-class ResourceDetailScreen extends StatelessWidget {
-  const ResourceDetailScreen({required this.resource, super.key});
+class ResourceDetailScreen extends StatefulWidget {
+  const ResourceDetailScreen({
+    required this.resourceId,
+    required this.repository,
+    super.key,
+  });
+
+  final String resourceId;
+  final ResourceRepository repository;
+
+  @override
+  State<ResourceDetailScreen> createState() => _ResourceDetailScreenState();
+}
+
+class _ResourceDetailScreenState extends State<ResourceDetailScreen> {
+  CommunityResource? _resource;
+  ResourceRepositoryErrorType? _errorType;
+  bool _isLoading = true;
+  int _requestGeneration = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadResource();
+  }
+
+  @override
+  void dispose() {
+    _requestGeneration++;
+    super.dispose();
+  }
+
+  Future<void> _loadResource() async {
+    final generation = ++_requestGeneration;
+    setState(() {
+      _isLoading = true;
+      _errorType = null;
+    });
+    try {
+      final resource = await widget.repository.fetchResource(widget.resourceId);
+      if (!mounted || generation != _requestGeneration) return;
+      setState(() {
+        _resource = resource;
+        _isLoading = false;
+      });
+    } on ResourceRepositoryException catch (error) {
+      if (!mounted || generation != _requestGeneration) return;
+      setState(() {
+        _resource = null;
+        _errorType = error.type;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted || generation != _requestGeneration) return;
+      setState(() {
+        _resource = null;
+        _errorType = ResourceRepositoryErrorType.connection;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_resource != null && !_isLoading) {
+      return _ResourceDetailContent(resource: _resource!);
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F7F6),
+      appBar: AppBar(
+        title: const Text('Resource details'),
+        backgroundColor: const Color(0xFF176B5B),
+        foregroundColor: Colors.white,
+      ),
+      body: SafeArea(
+        child: Center(
+          child: _isLoading
+              ? const CircularProgressIndicator(
+                  key: Key('resource-detail-loading'),
+                )
+              : _DetailLoadError(
+                  isNotFound:
+                      _errorType == ResourceRepositoryErrorType.notFound,
+                  onRetry: _loadResource,
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailLoadError extends StatelessWidget {
+  const _DetailLoadError({required this.isNotFound, required this.onRetry});
+
+  final bool isNotFound;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      key: Key(
+        isNotFound ? 'resource-detail-not-found' : 'resource-detail-error',
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isNotFound ? Icons.search_off : Icons.cloud_off_outlined,
+            size: 56,
+            color: Theme.of(context).colorScheme.outline,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            isNotFound ? 'Resource not found' : 'Unable to load this resource',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isNotFound
+                ? 'This listing may no longer be available.'
+                : 'Check the connection to the local API and try again.',
+            textAlign: TextAlign.center,
+          ),
+          if (!isNotFound) ...[
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              key: const Key('resource-detail-retry'),
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ResourceDetailContent extends StatelessWidget {
+  const _ResourceDetailContent({required this.resource});
 
   final CommunityResource resource;
 

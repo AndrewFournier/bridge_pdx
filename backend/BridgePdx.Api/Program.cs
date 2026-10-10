@@ -50,7 +50,10 @@ else
     app.UseExceptionHandler();
 }
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"))
+{
+    app.UseHttpsRedirection();
+}
 
 app.MapControllers();
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }))
