@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/community_resource.dart';
 import '../models/resource_query.dart';
 import '../repositories/resource_repository.dart';
+import '../repositories/report_repository.dart';
 import '../widgets/resource_card.dart';
 import 'resource_detail_screen.dart';
 
@@ -10,11 +11,13 @@ class ResourceListScreen extends StatefulWidget {
   const ResourceListScreen({
     required this.query,
     required this.repository,
+    required this.reportRepository,
     super.key,
   });
 
   final ResourceQuery query;
   final ResourceRepository repository;
+  final ReportRepository reportRepository;
 
   @override
   State<ResourceListScreen> createState() => _ResourceListScreenState();
@@ -153,6 +156,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
                           builder: (_) => ResourceDetailScreen(
                             resourceId: resource.id,
                             repository: widget.repository,
+                            reportRepository: widget.reportRepository,
                           ),
                         ),
                       ),

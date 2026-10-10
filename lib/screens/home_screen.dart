@@ -4,13 +4,19 @@ import '../data/resource_categories.dart';
 import '../models/resource_category.dart';
 import '../models/resource_query.dart';
 import '../repositories/resource_repository.dart';
+import '../repositories/report_repository.dart';
 import '../widgets/category_card.dart';
 import 'resource_list_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({required this.repository, super.key});
+  const HomeScreen({
+    required this.repository,
+    required this.reportRepository,
+    super.key,
+  });
 
   final ResourceRepository repository;
+  final ReportRepository reportRepository;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -48,6 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute<void>(
         builder: (_) => ResourceListScreen(
           repository: widget.repository,
+          reportRepository: widget.reportRepository,
           query: ResourceQuery(
             category: category,
             zipCode: trimmedZip.isEmpty ? null : trimmedZip,

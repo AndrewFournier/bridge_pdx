@@ -2,11 +2,17 @@ import 'package:flutter/material.dart';
 
 import '../models/community_resource.dart';
 import '../models/outdated_information_report.dart';
+import '../repositories/report_repository.dart';
 
 class ReportOutdatedInformationScreen extends StatefulWidget {
-  const ReportOutdatedInformationScreen({required this.resource, super.key});
+  const ReportOutdatedInformationScreen({
+    required this.resource,
+    required this.repository,
+    super.key,
+  });
 
   final CommunityResource resource;
+  final ReportRepository repository;
 
   @override
   State<ReportOutdatedInformationScreen> createState() =>
@@ -20,6 +26,9 @@ class _ReportOutdatedInformationScreenState
   final _detailsController = TextEditingController();
   ReportReason? _selectedReason;
   bool _showReasonError = false;
+  bool _isSubmitting = false;
+  String? _submissionError;
+  int _remainingCharacters = _detailsLimit;
 
   @override
   void dispose() {
@@ -27,18 +36,52 @@ class _ReportOutdatedInformationScreenState
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    if (_isSubmitting) return;
     if (_selectedReason == null) {
       setState(() => _showReasonError = true);
       return;
     }
 
+    final details = _detailsController.text.trim();
     final report = OutdatedInformationReport(
       resourceId: widget.resource.id,
       reason: _selectedReason!,
-      details: _detailsController.text.trim(),
+      details: details.isEmpty ? null : details,
     );
-    Navigator.of(context).pop(report);
+    setState(() {
+      _isSubmitting = true;
+      _submissionError = null;
+    });
+    try {
+      final submitted = await widget.repository.submitReport(report);
+      if (mounted) Navigator.of(context).pop(submitted);
+    } on ReportRepositoryException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _submissionError = switch (error.type) {
+          ReportRepositoryErrorType.validation =>
+            'Please review the report details and try again.',
+          ReportRepositoryErrorType.notFound =>
+            'This resource is no longer available for reporting.',
+          ReportRepositoryErrorType.rateLimited =>
+            'Too many reports were submitted. Please wait and try again.',
+          ReportRepositoryErrorType.connection =>
+            'Unable to submit the report. Check your connection and try again.',
+          ReportRepositoryErrorType.server ||
+          ReportRepositoryErrorType.invalidResponse =>
+            'The report could not be submitted right now. Please try again.',
+        };
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _submissionError =
+            'Unable to submit the report. Check your connection and try again.';
+      });
+    }
   }
 
   @override
@@ -68,7 +111,7 @@ class _ReportOutdatedInformationScreenState
                 child: const Padding(
                   padding: EdgeInsets.all(14),
                   child: Text(
-                    'Anonymous prototype form — no identity is collected. Reports are not transmitted or permanently saved yet.',
+                    'Reports are submitted anonymously. BridgePDX does not ask for your name, email address, or phone number on this form.',
                   ),
                 ),
               ),
@@ -109,19 +152,42 @@ class _ReportOutdatedInformationScreenState
                 controller: _detailsController,
                 maxLength: _detailsLimit,
                 maxLines: 5,
-                decoration: const InputDecoration(
+                onChanged: (value) => setState(
+                  () => _remainingCharacters = _detailsLimit - value.length,
+                ),
+                decoration: InputDecoration(
                   labelText: 'Additional details (optional)',
                   hintText: 'Describe what should be corrected.',
                   border: OutlineInputBorder(),
                   alignLabelWithHint: true,
+                  counterText: '$_remainingCharacters characters remaining',
                 ),
               ),
+              if (_submissionError != null) ...[
+                const SizedBox(height: 8),
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    _submissionError!,
+                    key: const Key('report-submission-error'),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
               FilledButton.icon(
                 key: const Key('submit-report-button'),
-                onPressed: _submit,
-                icon: const Icon(Icons.send_outlined),
-                label: const Text('Submit report'),
+                onPressed: _isSubmitting ? null : _submit,
+                icon: _isSubmitting
+                    ? const SizedBox.square(
+                        key: Key('report-submitting-indicator'),
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.send_outlined),
+                label: Text(_isSubmitting ? 'Submitting…' : 'Submit report'),
               ),
             ],
           ),

@@ -34,6 +34,10 @@ public sealed class BridgePdxApiFactory : WebApplicationFactory<Program>
             services.AddDbContext<BridgePdxDbContext>(options =>
                 options.UseInMemoryDatabase(_databaseName)
             );
+            services.RemoveAll<TimeProvider>();
+            services.AddSingleton<TimeProvider>(
+                new FixedTimeProvider(new DateTimeOffset(2026, 10, 9, 12, 0, 0, TimeSpan.Zero))
+            );
         });
     }
 
@@ -119,4 +123,9 @@ public sealed class BridgePdxApiFactory : WebApplicationFactory<Program>
         LastVerified = new DateOnly(2026, 9, 15),
         IsActive = isActive,
     };
+
+    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => utcNow;
+    }
 }

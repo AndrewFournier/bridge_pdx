@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/fake_resource_repository.dart';
+import 'support/fake_report_repository.dart';
 
 void main() {
   testWidgets('BridgePDX home screen loads with all resource categories', (
@@ -121,13 +122,11 @@ void main() {
     expect(find.text('Accessibility'), findsOneWidget);
   });
 
-  testWidgets('report action opens anonymous prototype report form', (
-    tester,
-  ) async {
+  testWidgets('report action opens anonymous report form', (tester) async {
     await _openReportForm(tester);
 
     expect(find.text('Report outdated information'), findsOneWidget);
-    expect(find.textContaining('no identity is collected'), findsOneWidget);
+    expect(find.textContaining('submitted anonymously'), findsOneWidget);
     expect(find.text('Incorrect hours'), findsOneWidget);
     expect(find.byKey(const Key('report-details-field')), findsOneWidget);
   });
@@ -155,10 +154,7 @@ void main() {
 
     expect(find.text('Resource details'), findsOneWidget);
     expect(find.byKey(const Key('report-confirmation')), findsOneWidget);
-    expect(
-      find.textContaining('recorded for this session only'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('submitted for review'), findsOneWidget);
   });
 }
 
@@ -182,7 +178,10 @@ Future<void> _pumpApp(
   FakeResourceRepository? repository,
 ]) async {
   await tester.pumpWidget(
-    BridgePdxApp(repository: repository ?? FakeResourceRepository()),
+    BridgePdxApp(
+      repository: repository ?? FakeResourceRepository(),
+      reportRepository: FakeReportRepository(),
+    ),
   );
 }
 

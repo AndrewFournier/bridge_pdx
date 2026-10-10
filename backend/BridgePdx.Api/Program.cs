@@ -1,5 +1,6 @@
 using BridgePdx.Api.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,6 +8,25 @@ builder.Services.AddControllers();
 builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddSingleton(TimeProvider.System);
+var reportPermitLimit = builder.Configuration.GetValue("RateLimiting:ReportSubmission:PermitLimit", 10);
+var reportWindowSeconds = builder.Configuration.GetValue("RateLimiting:ReportSubmission:WindowSeconds", 60);
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("ReportSubmission", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            $"{context.Connection.RemoteIpAddress}:{context.Request.RouteValues["resourceId"]}",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = Math.Max(1, reportPermitLimit),
+                Window = TimeSpan.FromSeconds(Math.Max(1, reportWindowSeconds)),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            }
+        )
+    );
+});
 
 var connectionString = builder.Configuration.GetConnectionString("BridgePdx");
 if (connectionString is null && !builder.Environment.IsEnvironment("Testing"))
@@ -54,6 +74,8 @@ if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"
 {
     app.UseHttpsRedirection();
 }
+
+app.UseRateLimiter();
 
 app.MapControllers();
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }))

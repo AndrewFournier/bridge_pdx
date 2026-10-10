@@ -12,7 +12,7 @@ All current listings, organizations, addresses, phone numbers, websites, eligibi
 - `backend/BridgePdx.Backend.sln`: backend solution containing both .NET projects.
 - `backend/compose.yaml`: optional local PostgreSQL 17 development service with a named data volume and health check.
 
-The API keeps its persistence entity separate from its public response model so internal database concerns are not exposed unnecessarily.
+The API keeps persistence entities separate from public response models so internal database concerns are not exposed unnecessarily. Outdated-information reports are stored for later review; no administrator or moderation interface exists yet.
 
 ## Prerequisites
 
@@ -129,8 +129,33 @@ Available routes:
 - `GET /health`
 - `GET /api/resources`
 - `GET /api/resources/{id}`
+- `POST /api/resources/{resourceId}/reports`
 
 The collection route accepts combinable `category`, `zipCode`, `openNow`, and `wheelchairAccessible` query parameters. Resource routes return active listings only.
+
+### Anonymous outdated-information reports
+
+The Flutter resource-detail screen submits reports through its own injected repository. The form asks for a reason and optional details only; it does not ask for a name, email address, phone number, account, or other identity field. Server responses likewise contain only report workflow data. As with any web request, infrastructure outside this application may still produce operational network logs, so the UI does not promise absolute anonymity.
+
+Submit a report with:
+
+```http
+POST /api/resources/{resourceId}/reports
+Content-Type: application/json
+
+{
+  "reason": "incorrect_hours",
+  "details": "The posted weekday hours appear to have changed."
+}
+```
+
+Supported stable reason codes are `incorrect_hours`, `incorrect_address`, `incorrect_phone_or_website`, `service_no_longer_available`, `eligibility_incorrect`, `accessibility_incorrect`, and `other`. Details are trimmed, whitespace-only details become `null`, and non-null details are limited to 500 characters. Missing or unsupported reasons and overlong details return the standard ASP.NET Core `400` validation response. Unknown or inactive resources return `404`; repeated submissions for the same resource and client can return `429`.
+
+A successful request returns `201 Created` with the report ID, resource ID, reason, normalized details, UTC submission time, and `pending` review status. There is deliberately no public report-listing endpoint and no create/edit/delete resource or administration endpoint.
+
+Submission rate limiting uses ASP.NET Core's fixed-window limiter and applies only to the report endpoint. Defaults are 10 submissions per client/resource pair per 60 seconds. Override `RateLimiting__ReportSubmission__PermitLimit` and `RateLimiting__ReportSubmission__WindowSeconds` through environment configuration when needed; use deployment-appropriate values rather than disabling the policy.
+
+The `AddResourceReports` migration creates the report table, restrictive resource foreign key, and resource/status/submission-date indexes. Apply it with the migration command above before submitting reports to an existing database.
 
 ## Run tests and checks
 

@@ -51,4 +51,6 @@ public sealed class ResourceEntity
     public bool IsWheelchairAccessible { get; set; }
     public DateOnly LastVerified { get; set; }
     public bool IsActive { get; set; }
+
+    public ICollection<ResourceReportEntity> Reports { get; set; } = [];
 }

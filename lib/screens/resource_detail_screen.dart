@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/community_resource.dart';
 import '../models/outdated_information_report.dart';
 import '../repositories/resource_repository.dart';
+import '../repositories/report_repository.dart';
 import '../widgets/detail_section.dart';
 import 'report_outdated_information_screen.dart';
 
@@ -10,11 +11,13 @@ class ResourceDetailScreen extends StatefulWidget {
   const ResourceDetailScreen({
     required this.resourceId,
     required this.repository,
+    required this.reportRepository,
     super.key,
   });
 
   final String resourceId;
   final ResourceRepository repository;
+  final ReportRepository reportRepository;
 
   @override
   State<ResourceDetailScreen> createState() => _ResourceDetailScreenState();
@@ -71,7 +74,10 @@ class _ResourceDetailScreenState extends State<ResourceDetailScreen> {
   @override
   Widget build(BuildContext context) {
     if (_resource != null && !_isLoading) {
-      return _ResourceDetailContent(resource: _resource!);
+      return _ResourceDetailContent(
+        resource: _resource!,
+        reportRepository: widget.reportRepository,
+      );
     }
 
     return Scaffold(
@@ -148,9 +154,13 @@ class _DetailLoadError extends StatelessWidget {
 }
 
 class _ResourceDetailContent extends StatelessWidget {
-  const _ResourceDetailContent({required this.resource});
+  const _ResourceDetailContent({
+    required this.resource,
+    required this.reportRepository,
+  });
 
   final CommunityResource resource;
+  final ReportRepository reportRepository;
 
   void _showPendingAction(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
@@ -159,9 +169,12 @@ class _ResourceDetailContent extends StatelessWidget {
   }
 
   Future<void> _openReport(BuildContext context) async {
-    final report = await Navigator.of(context).push<OutdatedInformationReport>(
-      MaterialPageRoute<OutdatedInformationReport>(
-        builder: (_) => ReportOutdatedInformationScreen(resource: resource),
+    final report = await Navigator.of(context).push<SubmittedResourceReport>(
+      MaterialPageRoute<SubmittedResourceReport>(
+        builder: (_) => ReportOutdatedInformationScreen(
+          resource: resource,
+          repository: reportRepository,
+        ),
       ),
     );
     if (report == null || !context.mounted) return;
@@ -170,7 +183,7 @@ class _ResourceDetailContent extends StatelessWidget {
       SnackBar(
         key: const Key('report-confirmation'),
         content: Text(
-          'Thank you. Your ${report.reason.label.toLowerCase()} report was recorded for this session only.',
+          'Thank you. Your ${report.reason.label.toLowerCase()} report was submitted for review.',
         ),
       ),
     );

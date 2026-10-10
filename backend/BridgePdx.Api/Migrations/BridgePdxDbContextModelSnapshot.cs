@@ -122,6 +122,59 @@ namespace BridgePdx.Api.Migrations
 
                     b.ToTable("Resources", (string)null);
                 });
+
+            modelBuilder.Entity("BridgePdx.Api.Entities.ResourceReportEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Details")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ResourceId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("SubmittedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ResourceId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("SubmittedAtUtc");
+
+                    b.ToTable("ResourceReports", (string)null);
+                });
+
+            modelBuilder.Entity("BridgePdx.Api.Entities.ResourceReportEntity", b =>
+                {
+                    b.HasOne("BridgePdx.Api.Entities.ResourceEntity", "Resource")
+                        .WithMany("Reports")
+                        .HasForeignKey("ResourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Resource");
+                });
+
+            modelBuilder.Entity("BridgePdx.Api.Entities.ResourceEntity", b =>
+                {
+                    b.Navigation("Reports");
+                });
 #pragma warning restore 612, 618
         }
     }
