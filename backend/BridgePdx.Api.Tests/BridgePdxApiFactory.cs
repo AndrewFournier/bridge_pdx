@@ -1,6 +1,7 @@
 using BridgePdx.Api.Data;
 using BridgePdx.Api.Entities;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -24,6 +25,10 @@ public sealed class BridgePdxApiFactory : WebApplicationFactory<Program>
                 new Dictionary<string, string?>
                 {
                     ["ConnectionStrings:BridgePdx"] = "Host=unused-for-tests",
+                    ["Jwt:Issuer"] = "BridgePdx.Api.Tests",
+                    ["Jwt:Audience"] = "BridgePdx.Api.Tests.Client",
+                    ["Jwt:SigningKey"] = "test-only-signing-key-with-at-least-32-characters",
+                    ["Jwt:LifetimeMinutes"] = "15",
                 }
             );
         });
@@ -34,9 +39,17 @@ public sealed class BridgePdxApiFactory : WebApplicationFactory<Program>
             services.AddDbContext<BridgePdxDbContext>(options =>
                 options.UseInMemoryDatabase(_databaseName)
             );
+            var fixedTimeProvider = new FixedTimeProvider(
+                new DateTimeOffset(2026, 10, 9, 12, 0, 0, TimeSpan.Zero)
+            );
             services.RemoveAll<TimeProvider>();
-            services.AddSingleton<TimeProvider>(
-                new FixedTimeProvider(new DateTimeOffset(2026, 10, 9, 12, 0, 0, TimeSpan.Zero))
+            services.AddSingleton<TimeProvider>(fixedTimeProvider);
+            services.PostConfigure<JwtBearerOptions>(
+                JwtBearerDefaults.AuthenticationScheme,
+                options => options.TokenValidationParameters.LifetimeValidator =
+                    (notBefore, expires, _, _) =>
+                        notBefore <= fixedTimeProvider.GetUtcNow().UtcDateTime
+                        && expires >= fixedTimeProvider.GetUtcNow().UtcDateTime
             );
         });
     }
@@ -49,7 +62,69 @@ public sealed class BridgePdxApiFactory : WebApplicationFactory<Program>
         dbContext.Database.EnsureCreated();
         dbContext.Resources.AddRange(TestResources());
         dbContext.SaveChanges();
+        SeedAdministrators(scope.ServiceProvider).GetAwaiter().GetResult();
+        SeedReports(dbContext);
         return host;
+    }
+
+    public static readonly Guid PendingReportId = Guid.Parse("10000000-0000-0000-0000-000000000001");
+    public static readonly Guid ReviewedReportId = Guid.Parse("10000000-0000-0000-0000-000000000002");
+    public const string AdministratorEmail = "admin@example.invalid";
+    public const string AdministratorPassword = "Test-Administrator-Password-123!";
+
+    private static async Task SeedAdministrators(IServiceProvider services)
+    {
+        var roleManager = services.GetRequiredService<Microsoft.AspNetCore.Identity.RoleManager<Microsoft.AspNetCore.Identity.IdentityRole>>();
+        await roleManager.CreateAsync(new Microsoft.AspNetCore.Identity.IdentityRole("Administrator"));
+        var userManager = services.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<AdministratorUser>>();
+        var administrator = new AdministratorUser
+        {
+            Id = "test-administrator",
+            UserName = AdministratorEmail,
+            Email = AdministratorEmail,
+            EmailConfirmed = true,
+        };
+        await userManager.CreateAsync(administrator, AdministratorPassword);
+        await userManager.AddToRoleAsync(administrator, "Administrator");
+        await userManager.CreateAsync(
+            new AdministratorUser
+            {
+                Id = "test-non-administrator",
+                UserName = "viewer@example.invalid",
+                Email = "viewer@example.invalid",
+                EmailConfirmed = true,
+            },
+            AdministratorPassword
+        );
+    }
+
+    private static void SeedReports(BridgePdxDbContext dbContext)
+    {
+        dbContext.ResourceReports.AddRange(
+            new ResourceReportEntity
+            {
+                Id = PendingReportId,
+                ResourceId = "active-food-97201",
+                Resource = dbContext.Resources.Find("active-food-97201")!,
+                Reason = ReportReason.IncorrectHours,
+                Details = "Sample pending report",
+                SubmittedAtUtc = new DateTimeOffset(2026, 10, 8, 12, 0, 0, TimeSpan.Zero),
+                Status = ReportReviewStatus.Pending,
+            },
+            new ResourceReportEntity
+            {
+                Id = ReviewedReportId,
+                ResourceId = "active-housing-97201",
+                Resource = dbContext.Resources.Find("active-housing-97201")!,
+                Reason = ReportReason.IncorrectAddress,
+                Details = "Sample reviewed report",
+                SubmittedAtUtc = new DateTimeOffset(2026, 10, 7, 12, 0, 0, TimeSpan.Zero),
+                Status = ReportReviewStatus.Reviewed,
+                ReviewedAtUtc = new DateTimeOffset(2026, 10, 8, 8, 0, 0, TimeSpan.Zero),
+                ReviewingAdministratorId = "test-administrator",
+            }
+        );
+        dbContext.SaveChanges();
     }
 
     private static IEnumerable<ResourceEntity> TestResources()

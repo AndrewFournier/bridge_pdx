@@ -41,3 +41,21 @@ public static class ReportReasonCodes
     public static string ToCode(this ReportReason reason) =>
         Values.Single(pair => pair.Value == reason).Key;
 }
+
+public static class ReportStatusCodes
+{
+    private static readonly IReadOnlyDictionary<string, ReportReviewStatus> Values =
+        new Dictionary<string, ReportReviewStatus>(StringComparer.Ordinal)
+        {
+            ["pending"] = ReportReviewStatus.Pending,
+            ["reviewed"] = ReportReviewStatus.Reviewed,
+            ["resolved"] = ReportReviewStatus.Resolved,
+            ["dismissed"] = ReportReviewStatus.Dismissed,
+        };
+
+    public static bool TryParse(string? code, out ReportReviewStatus status) =>
+        Values.TryGetValue(code ?? string.Empty, out status);
+
+    public static string ToCode(this ReportReviewStatus status) =>
+        Values.Single(pair => pair.Value == status).Key;
+}

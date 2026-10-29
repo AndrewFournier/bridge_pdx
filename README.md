@@ -7,12 +7,12 @@ All current listings, organizations, addresses, phone numbers, websites, eligibi
 ## Architecture
 
 - `lib/` and `test/`: Flutter Material 3 application, HTTP repository, JSON mapping, and deterministic tests with fake repositories.
-- `backend/BridgePdx.Api`: .NET 10 ASP.NET Core Web API, EF Core, PostgreSQL configuration, development seed data, health check, and Swagger UI.
+- `backend/BridgePdx.Api`: .NET 10 ASP.NET Core Web API, EF Core, PostgreSQL configuration, ASP.NET Core Identity administrator accounts, JWT bearer authentication, development seed data, health check, and Swagger UI.
 - `backend/BridgePdx.Api.Tests`: isolated HTTP integration tests using EF Core's in-memory provider. PostgreSQL and Docker are not required for tests.
 - `backend/BridgePdx.Backend.sln`: backend solution containing both .NET projects.
 - `backend/compose.yaml`: optional local PostgreSQL 17 development service with a named data volume and health check.
 
-The API keeps persistence entities separate from public response models so internal database concerns are not exposed unnecessarily. Outdated-information reports are stored for later review; no administrator or moderation interface exists yet.
+The API keeps persistence entities separate from public response models so internal database concerns are not exposed unnecessarily. Public users remain account-free. Administrator accounts live in the same PostgreSQL database and use ASP.NET Core Identity password hashing and lockout; there is no public registration endpoint or administrator UI yet.
 
 ## Prerequisites
 
@@ -53,6 +53,28 @@ export ConnectionStrings__BridgePdx='Host=localhost;Port=5432;Database=bridgepdx
 ```
 
 For deployed environments, provide `ConnectionStrings__BridgePdx` through the hosting platform's secret manager. Swagger, development seeding, automatic migration, and Flutter-development CORS are enabled only in the Development environment.
+
+## Configure administrator authentication
+
+JWT signing material and bootstrap credentials are intentionally absent from tracked configuration. For local development, use .NET user-secrets from the repository root:
+
+```sh
+dotnet user-secrets set "Jwt:SigningKey" "replace-with-a-random-secret-at-least-32-characters" --project backend/BridgePdx.Api
+dotnet user-secrets set "DevelopmentAdministrator:Email" "your-development-admin@example.invalid" --project backend/BridgePdx.Api
+dotnet user-secrets set "DevelopmentAdministrator:Password" "replace-with-a-unique-strong-development-password" --project backend/BridgePdx.Api
+```
+
+Equivalent environment-variable names are:
+
+```text
+Jwt__SigningKey
+DevelopmentAdministrator__Email
+DevelopmentAdministrator__Password
+```
+
+`Jwt:Issuer` and `Jwt:Audience` have non-secret application identifiers in `appsettings.json`; override them through `Jwt__Issuer` and `Jwt__Audience` when deployment architecture requires different values. Tokens expire after 15 minutes by default, configurable with `Jwt__LifetimeMinutes` up to the application-enforced 60-minute maximum.
+
+In Development, startup creates the `Administrator` role and one administrator only when both bootstrap values are explicitly supplied. It never logs the password, never overwrites an existing account, and never runs the bootstrap in Production. If both bootstrap credentials are absent, startup safely creates no account. Supplying only one is treated as configuration error. The signing key remains mandatory in every non-test environment.
 
 ## Restore tools and apply migrations
 
@@ -131,6 +153,36 @@ Available routes:
 - `GET /api/resources/{id}`
 - `POST /api/resources/{resourceId}/reports`
 
+Public routes do not require an account. Administrator routes require a valid bearer token with the `Administrator` role:
+
+- `POST /api/admin/auth/login` — anonymous credential exchange with generic failure responses
+- `GET /api/admin/auth/me` — safe administrator ID and email
+- `GET /api/admin/reports` — paginated report review queue
+- `GET /api/admin/reports/{id}` — report details
+- `PATCH /api/admin/reports/{id}/status` — reviewed, resolved, or dismissed workflow updates
+
+The report collection accepts `page`, `pageSize` (maximum 100), `status`, `reason`, `resourceId`, `submittedFromUtc`, and `submittedToUtc`. Results are newest-first and include safe resource context. Allowed transitions are `pending → reviewed`, `pending → dismissed`, `reviewed → resolved`, and `reviewed → dismissed`. Updates record the administrator ID and UTC review time. Reports cannot be deleted.
+
+Login example:
+
+```http
+POST /api/admin/auth/login
+Content-Type: application/json
+
+{
+  "email": "your-development-admin@example.invalid",
+  "password": "your-locally-configured-password"
+}
+```
+
+Use the returned token only in the authorization header:
+
+```http
+Authorization: Bearer your-short-lived-access-token
+```
+
+Do not put tokens in URLs. Login is protected by fixed-window rate limiting and Identity locks known accounts after five failed attempts for 15 minutes. Unknown accounts and incorrect passwords receive the same generic response.
+
 The collection route accepts combinable `category`, `zipCode`, `openNow`, and `wheelchairAccessible` query parameters. Resource routes return active listings only.
 
 ### Anonymous outdated-information reports
@@ -155,7 +207,15 @@ A successful request returns `201 Created` with the report ID, resource ID, reas
 
 Submission rate limiting uses ASP.NET Core's fixed-window limiter and applies only to the report endpoint. Defaults are 10 submissions per client/resource pair per 60 seconds. Override `RateLimiting__ReportSubmission__PermitLimit` and `RateLimiting__ReportSubmission__WindowSeconds` through environment configuration when needed; use deployment-appropriate values rather than disabling the policy.
 
-The `AddResourceReports` migration creates the report table, restrictive resource foreign key, and resource/status/submission-date indexes. Apply it with the migration command above before submitting reports to an existing database.
+The `AddResourceReports` migration creates the report table, restrictive resource foreign key, and resource/status/submission-date indexes. `AddAdministratorIdentityAndReportReview` adds the Identity schema plus nullable reviewer ID and UTC review timestamp without replacing existing resources or reports. Apply all pending migrations with the migration command above.
+
+### Swagger administrator authorization
+
+In Development, open `http://127.0.0.1:5080/swagger`, call the login endpoint, select **Authorize**, and enter the returned bearer token. Swagger contains no bootstrap password or signing key. Public and `/api/admin/...` routes are visibly separated by their route/controller labels.
+
+### Authentication security boundaries
+
+This foundation provides password hashing, lockout, signed short-lived access tokens, server-side role authorization, and narrowly scoped response models. It does not yet provide refresh tokens, password reset, email verification, MFA, key rotation automation, token revocation, audit-log administration, or an administrator UI. Infrastructure may retain normal request metadata even though anonymous reports contain no reporter identity. The Flutter administrator interface is the next milestone; no administrator credential or token is stored in Flutter source.
 
 ## Run tests and checks
 

@@ -16,6 +16,9 @@ public enum ReportReason
 public enum ReportReviewStatus
 {
     Pending,
+    Reviewed,
+    Resolved,
+    Dismissed,
 }
 
 public sealed class ResourceReportEntity
@@ -33,4 +36,10 @@ public sealed class ResourceReportEntity
 
     public DateTimeOffset SubmittedAtUtc { get; set; }
     public ReportReviewStatus Status { get; set; }
+    public DateTimeOffset? ReviewedAtUtc { get; set; }
+
+    [StringLength(450)]
+    public string? ReviewingAdministratorId { get; set; }
+
+    public AdministratorUser? ReviewingAdministrator { get; set; }
 }
