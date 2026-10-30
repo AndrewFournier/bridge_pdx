@@ -73,7 +73,9 @@ class HttpResourceRepository implements ResourceRepository {
 
   @override
   Future<CommunityResource> fetchResource(String id) async {
-    final response = await _get(_endpoint('api/resources/$id'));
+    final response = await _get(
+      _endpoint('api/resources/${Uri.encodeComponent(id)}'),
+    );
     if (response.statusCode == 404) {
       throw const ResourceRepositoryException(
         ResourceRepositoryErrorType.notFound,

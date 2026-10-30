@@ -14,6 +14,8 @@ All current listings, organizations, addresses, phone numbers, websites, eligibi
 
 The API keeps persistence entities separate from public response models so internal database concerns are not exposed unnecessarily. Public users remain account-free. Administrator accounts live in the same PostgreSQL database and use ASP.NET Core Identity password hashing and lockout; there is no public registration endpoint or administrator UI yet.
 
+The normal Flutter application always loads resources through `HttpResourceRepository`. Fictional in-app sample resources are used only by explicitly injected test/development fakes; an API failure is shown to the user with retry guidance and never silently replaced with local results.
+
 ## Prerequisites
 
 - Flutter SDK compatible with the version in `.metadata`
@@ -82,7 +84,12 @@ From the repository root:
 
 ```sh
 dotnet tool restore --tool-manifest backend/dotnet-tools.json
-dotnet tool run dotnet-ef --tool-manifest backend/dotnet-tools.json -- database update --project backend/BridgePdx.Api/BridgePdx.Api.csproj --startup-project backend/BridgePdx.Api/BridgePdx.Api.csproj
+cd backend
+dotnet tool run dotnet-ef -- \
+  database update \
+  --project BridgePdx.Api/BridgePdx.Api.csproj \
+  --startup-project BridgePdx.Api/BridgePdx.Api.csproj
+cd ..
 ```
 
 The API also applies pending migrations and inserts clearly fictional seed resources when it starts in Development. The seeder is idempotent and is not run in production or tests.
@@ -101,7 +108,12 @@ The API also applies pending migrations and inserts clearly fictional seed resou
 
    ```sh
    dotnet tool restore --tool-manifest backend/dotnet-tools.json
-   dotnet tool run dotnet-ef --tool-manifest backend/dotnet-tools.json -- database update --project backend/BridgePdx.Api/BridgePdx.Api.csproj --startup-project backend/BridgePdx.Api/BridgePdx.Api.csproj
+   cd backend
+   dotnet tool run dotnet-ef -- \
+     database update \
+     --project BridgePdx.Api/BridgePdx.Api.csproj \
+     --startup-project BridgePdx.Api/BridgePdx.Api.csproj
+   cd ..
    ```
 
 4. Start the API with its stable Development launch profile:

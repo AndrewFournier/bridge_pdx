@@ -56,6 +56,67 @@ void main() {
     );
   });
 
+  test('maps server failures to a controlled repository error', () async {
+    final repository = HttpResourceRepository(
+      baseUri: Uri.parse('http://127.0.0.1:5080'),
+      client: MockClient((_) async => http.Response('Unavailable', 503)),
+    );
+
+    await expectLater(
+      repository.fetchResources(query: const ResourceQuery()),
+      throwsA(
+        isA<ResourceRepositoryException>().having(
+          (error) => error.type,
+          'type',
+          ResourceRepositoryErrorType.server,
+        ),
+      ),
+    );
+  });
+
+  test('maps network failures to a controlled repository error', () async {
+    final repository = HttpResourceRepository(
+      baseUri: Uri.parse('http://127.0.0.1:5080'),
+      client: MockClient((request) async {
+        throw http.ClientException('Connection refused', request.url);
+      }),
+    );
+
+    await expectLater(
+      repository.fetchResources(query: const ResourceQuery()),
+      throwsA(
+        isA<ResourceRepositoryException>().having(
+          (error) => error.type,
+          'type',
+          ResourceRepositoryErrorType.connection,
+        ),
+      ),
+    );
+  });
+
+  test('requests an encoded resource detail endpoint', () async {
+    late Uri requestedUri;
+    final repository = HttpResourceRepository(
+      baseUri: Uri.parse('http://127.0.0.1:5080'),
+      client: MockClient((request) async {
+        requestedUri = request.url;
+        return http.Response('', 404);
+      }),
+    );
+
+    await expectLater(
+      repository.fetchResource('sample resource/1'),
+      throwsA(
+        isA<ResourceRepositoryException>().having(
+          (error) => error.type,
+          'type',
+          ResourceRepositoryErrorType.notFound,
+        ),
+      ),
+    );
+    expect(requestedUri.path, '/api/resources/sample%20resource%2F1');
+  });
+
   test('uses platform-specific development API hosts', () {
     expect(
       ApiConfiguration.developmentBaseUri(
