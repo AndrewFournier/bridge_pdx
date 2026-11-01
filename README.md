@@ -78,6 +78,24 @@ DevelopmentAdministrator__Password
 
 In Development, startup creates the `Administrator` role and one administrator only when both bootstrap values are explicitly supplied. It never logs the password, never overwrites an existing account, and never runs the bootstrap in Production. If both bootstrap credentials are absent, startup safely creates no account. Supplying only one is treated as configuration error. The signing key remains mandatory in every non-test environment.
 
+### Open the Flutter administrator interface
+
+The public resource flow intentionally contains no administrator sign-in link. After PostgreSQL and the API are running and a development administrator has been bootstrapped, start Flutter directly on the documented administrator route:
+
+```sh
+flutter run --dart-define=BRIDGE_PDX_INITIAL_ROUTE=/admin
+```
+
+Combine it with an API override when needed:
+
+```sh
+flutter run \
+  --dart-define=BRIDGE_PDX_INITIAL_ROUTE=/admin \
+  --dart-define=BRIDGE_PDX_API_BASE_URL=http://127.0.0.1:5080
+```
+
+The administrator interface signs in through `POST /api/admin/auth/login`, verifies restored sessions through `/api/admin/auth/me`, and provides report filtering, details, pagination, and valid status transitions. The short-lived bearer token and expiration are stored using platform-provided secure storage, never plain preferences. Logout, local expiration, or an API `401` clears the stored session. Credentials and tokens are never compiled into Flutter source.
+
 ## Restore tools and apply migrations
 
 From the repository root:
